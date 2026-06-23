@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  web:
+    build: .
+    volumes:
+      - ./src:/app
+    ports:
+      - "8001:8000"
+    depends_on:
+      - db
+      # - redis
+    env_file:
+      - .env
+
+    command: >
+     sh -c "
+      python manage.py makemigrations &&
+      python manage.py migrate &&
+      exec gunicorn chat.wsgi:application --bind 0.0.0.0:8000 
+      "
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # redis:
+  #   image: redis:7
+  #   ports:
+  #     - "6379:6379"
+
+volumes:
+  postgres_data:

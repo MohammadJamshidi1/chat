@@ -1,0 +1,88 @@
+<!-- templates/chat.html -->
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat</title>
+    <script src="{% static 'messaging/js/websocket-manager.js' %}"></script>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <div id="typing-indicator" style="display: none;"></div>
+        <input type="text" id="message-input" placeholder="Type a message...">
+        <button id="send-button">Send</button>
+    </div>
+
+    <script>
+        // Get data from Django template
+        const chatId = {{ chat_id }};
+        const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYwOTc0NzQxLCJpYXQiOjE3NjA5NzM4NDEsImp0aSI6IjE4NjVjY2E2NTc4MDQwZmM4M2VhOTU0YmNhNjU5MzMxIiwidXNlcl9pZCI6IjIifQ.j-Sp1UqH6a1s4g_IsoF0xMBdbYtnUSA-K8tpq2ft0gw';
+        
+        // Create WebSocket manager
+        const wsManager = new ChatWebSocketManager(chatId, accessToken);
+        
+        // Handle incoming messages
+        wsManager.onNewMessage = (message) => {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            messageElement.innerHTML = `
+                <strong>${message.sender.username}:</strong>
+                <span>${message.content}</span>
+                <small>${new Date(message.sent_at).toLocaleTimeString()}</small>
+            `;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+        
+        // Handle typing indicators
+        wsManager.onTypingStart = (username) => {
+            const indicator = document.getElementById('typing-indicator');
+            indicator.textContent = `${username} is typing...`;
+            indicator.style.display = 'block';
+        };
+        
+        wsManager.onTypingStop = (username) => {
+            const indicator = document.getElementById('typing-indicator');
+            indicator.style.display = 'none';
+        };
+        
+        // Connect to WebSocket
+        wsManager.connect();
+        
+        // Send message on button click
+        document.getElementById('send-button').addEventListener('click', () => {
+            const input = document.getElementById('message-input');
+            const content = input.value.trim();
+            
+            if (content) {
+                wsManager.sendMessage(content);
+                input.value = '';
+            }
+        });
+        
+        // Send typing indicators
+        let typingTimer;
+        const input = document.getElementById('message-input');
+        
+        input.addEventListener('keyup', () => {
+            wsManager.sendTypingStart();
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => wsManager.sendTypingStop(), 1000);
+        });
+        
+        // Send on Enter key
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('send-button').click();
+            }
+        });
+        
+        // Disconnect on page unload
+        window.addEventListener('beforeunload', () => {
+            wsManager.disconnect();
+        });
+    </script>
+</body>
+</html>
